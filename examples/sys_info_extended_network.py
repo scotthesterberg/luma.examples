@@ -159,5 +159,5 @@ font_full = ImageFont.truetype(str(Path(__file__).resolve().parent.joinpath("fon
 
 while True:
     stats(device)
-    time.sleep(1.0)
+    time.sleep(5.0)
     scroll_offset = (scroll_offset + line_height) % device.height
