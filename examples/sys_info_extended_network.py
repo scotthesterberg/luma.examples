@@ -134,6 +134,7 @@ mem_history = []
 scroll_offset = 0
 
 device = get_device()
+device.contrast(50)
 font_default = ImageFont.truetype(str(Path(__file__).resolve().parent.joinpath("fonts", "DejaVuSansMono.ttf")), font_size)
 font_full = ImageFont.truetype(str(Path(__file__).resolve().parent.joinpath("fonts", "DejaVuSansMono.ttf")), font_size_full)
 
