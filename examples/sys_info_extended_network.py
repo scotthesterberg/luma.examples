@@ -57,8 +57,8 @@ def bytes2human(n):
 def network(iface):
     try:
         stat = psutil.net_io_counters(pernic=True)[iface]
-        return "%s: Tx%s, Rx%s" % \
-               (iface, bytes2human(stat.bytes_sent), bytes2human(stat.bytes_recv))
+        return "Tx%s, Rx%s" % \
+               (bytes2human(stat.bytes_sent), bytes2human(stat.bytes_recv))
     except KeyError:
         return f"{iface}: Not found"
 
@@ -66,47 +66,55 @@ def format_percent(percent):
     return "%5.1f" % (percent)
 
 def draw_text(draw, margin_x, line_num, text):
-    draw.text((margin_x, margin_y_line[line_num]), text, font=font_default, fill="white")
+    y = (margin_y_line[line_num] + scroll_offset) % device.height
+    draw.text((margin_x, y), text, font=font_default, fill="white")
+    if y + font_size >= device.height:
+        draw.text((margin_x, y - device.height), text, font=font_default, fill="white")
 
-def draw_bar(draw, line_num, percent):
-    top_left_y = margin_y_line[line_num] + bar_margin_top
-    draw.rectangle((margin_x_bar, top_left_y, margin_x_bar + bar_width, top_left_y + bar_height), outline="white")
-    draw.rectangle((margin_x_bar, top_left_y, margin_x_bar + bar_width * percent / 100, top_left_y + bar_height), fill="white")
+def draw_histogram(draw, line_num, data_history):
+    y = (margin_y_line[line_num] + bar_margin_top + scroll_offset) % device.height
 
-def draw_bar_full(draw, line_num):
-    top_left_y = margin_y_line[line_num] + bar_margin_top
-    draw.rectangle((margin_x_bar, top_left_y, margin_x_bar + bar_width_full, top_left_y + bar_height), fill="white")
-    draw.text((65, top_left_y - 2), "100 %", font=font_full, fill="black")
+    def _draw(top_y):
+        bottom_y = top_y + bar_height
+        draw.rectangle((margin_x_bar, top_y, margin_x_bar + bar_width, bottom_y), outline="white")
+        for i, val in enumerate(data_history):
+            height = int(val / 100.0 * bar_height)
+            x = margin_x_bar + i
+            if height > 0:
+                draw.line((x, bottom_y, x, bottom_y - height), fill="white")
+
+    _draw(y)
+    if y + bar_height >= device.height:
+        _draw(y - device.height)
 
 def stats(device):
+    global cpu_history, mem_history
     with canvas(device) as draw:
         temp = get_temp()
         draw_text(draw, 0, 0, "Temp")
         draw_text(draw, margin_x_figure, 0, "%s'C" % (format_percent(temp)))
 
         cpu = get_cpu()
+        cpu_history.append(cpu)
+        if len(cpu_history) > bar_width:
+            cpu_history.pop(0)
+
         draw_text(draw, 0, 1, "CPU")
-        if cpu < 100:
-            draw_text(draw, margin_x_figure, 1, "%s %%" % (format_percent(cpu)))
-            draw_bar(draw, 1, cpu)
-        else:
-            draw_bar_full(draw, 1)
+        draw_text(draw, margin_x_figure, 1, "%s %%" % (format_percent(cpu)))
+        draw_histogram(draw, 1, cpu_history)
 
         mem = get_mem()
+        mem_history.append(mem)
+        if len(mem_history) > bar_width:
+            mem_history.pop(0)
+
         draw_text(draw, 0, 2, "Mem")
-        if mem < 100:
-            draw_text(draw, margin_x_figure, 2, "%s %%" % (format_percent(mem)))
-            draw_bar(draw, 2, mem)
-        else:
-            draw_bar_full(draw, 2)
+        draw_text(draw, margin_x_figure, 2, "%s %%" % (format_percent(mem)))
+        draw_histogram(draw, 2, mem_history)
 
         disk = get_disk_usage()
         draw_text(draw, 0, 3, "Disk")
-        if disk < 100:
-            draw_text(draw, margin_x_figure, 3, "%s %%" % (format_percent(disk)))
-            draw_bar(draw, 3, disk)
-        else:
-            draw_bar_full(draw, 3)
+        draw_text(draw, margin_x_figure, 3, "%s %%" % (format_percent(disk)))
 
         draw_text(draw, 0, 4, network('eth0'))
 
@@ -121,6 +129,10 @@ bar_width_full = 95
 bar_height = 8
 bar_margin_top = 3
 
+cpu_history = []
+mem_history = []
+scroll_offset = 0
+
 device = get_device()
 font_default = ImageFont.truetype(str(Path(__file__).resolve().parent.joinpath("fonts", "DejaVuSansMono.ttf")), font_size)
 font_full = ImageFont.truetype(str(Path(__file__).resolve().parent.joinpath("fonts", "DejaVuSansMono.ttf")), font_size_full)
@@ -129,3 +141,4 @@ font_full = ImageFont.truetype(str(Path(__file__).resolve().parent.joinpath("fon
 while True:
     stats(device)
     time.sleep(0.5)
+    scroll_offset = (scroll_offset + 1) % device.height
