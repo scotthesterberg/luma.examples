@@ -1,0 +1,13 @@
+[Unit]
+Description=Luma Sys Info Extended Network Display
+After=network.target
+
+[Service]
+Type=simple
+# %h resolves to the user home directory (e.g. /home/pi)
+ExecStart=/bin/bash -c 'source %h/.venv/python3/bin/activate && python %h/git/github/personal/luma.examples/examples/sys_info_extended_network.py'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
