@@ -54,11 +54,28 @@ def bytes2human(n):
             return '%s%s' % (value, s)
     return f"{n}B"
 
+last_net_stats = {}
+
 def network(iface):
+    global last_net_stats
     try:
         stat = psutil.net_io_counters(pernic=True)[iface]
-        return "Tx%s, Rx%s" % \
-               (bytes2human(stat.bytes_sent), bytes2human(stat.bytes_recv))
+        now = time.time()
+        tx = stat.bytes_sent
+        rx = stat.bytes_recv
+
+        tx_rate = 0
+        rx_rate = 0
+        if iface in last_net_stats:
+            dt = now - last_net_stats[iface]['time']
+            if dt > 0:
+                tx_rate = (tx - last_net_stats[iface]['tx']) / dt
+                rx_rate = (rx - last_net_stats[iface]['rx']) / dt
+
+        last_net_stats[iface] = {'tx': tx, 'rx': rx, 'time': now}
+
+        return "Tx%s/s, Rx%s/s" % \
+               (bytes2human(int(tx_rate)), bytes2human(int(rx_rate)))
     except KeyError:
         return f"{iface}: Not found"
 
@@ -128,6 +145,7 @@ bar_width = 52
 bar_width_full = 95
 bar_height = 8
 bar_margin_top = 3
+line_height = 13
 
 cpu_history = []
 mem_history = []
@@ -141,5 +159,5 @@ font_full = ImageFont.truetype(str(Path(__file__).resolve().parent.joinpath("fon
 
 while True:
     stats(device)
-    time.sleep(0.5)
-    scroll_offset = (scroll_offset + 1) % device.height
+    time.sleep(1.0)
+    scroll_offset = (scroll_offset + line_height) % device.height
